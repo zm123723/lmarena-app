@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'dart:io';
 import 'dart:async';
 
 void main() {
@@ -170,18 +169,8 @@ class _WebViewPageState extends State<WebViewPage> with WidgetsBindingObserver {
             // 允许所有导航
             return NavigationDecision.navigate;
           },
-          onHttpError: (HttpResponseError error) {
-            debugPrint('HTTP Error: ${error.response?.statusCode}');
-          },
         ),
       );
-
-    // Android 特定配置
-    if (Platform.isAndroid) {
-      controller.setOnConsoleMessage((JavaScriptConsoleMessage message) {
-        debugPrint('JS Console [${message.level.name}]: ${message.message}');
-      });
-    }
 
     // 加载页面
     _loadPage();
