@@ -46,7 +46,6 @@ class HomePage extends StatelessWidget {
 
   final String targetUrl = 'https://lmarena.ai/c/new?chat-modality=chat&mode=direct';
 
-  // 使用 Chrome Custom Tabs 打开（推荐）
   Future<void> _openInCustomTab(BuildContext context) async {
     try {
       await launchUrl(
@@ -71,12 +70,10 @@ class HomePage extends StatelessWidget {
       );
     } catch (e) {
       debugPrint('Custom Tab error: $e');
-      // 如果 Custom Tab 失败，尝试用浏览器打开
       _openInBrowser(context);
     }
   }
 
-  // 使用系统浏览器打开
   Future<void> _openInBrowser(BuildContext context) async {
     final uri = Uri.parse(targetUrl);
     try {
@@ -123,7 +120,6 @@ class HomePage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo / Icon
                   Container(
                     width: 120,
                     height: 120,
@@ -147,7 +143,6 @@ class HomePage extends StatelessWidget {
                   
                   const SizedBox(height: 40),
                   
-                  // Title
                   Text(
                     'LM Arena',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
@@ -157,7 +152,6 @@ class HomePage extends StatelessWidget {
                   
                   const SizedBox(height: 12),
                   
-                  // Subtitle
                   Text(
                     '与多个 AI 模型对话\n比较不同模型的回答',
                     textAlign: TextAlign.center,
@@ -168,7 +162,6 @@ class HomePage extends StatelessWidget {
                   
                   const SizedBox(height: 60),
                   
-                  // 主按钮 - Chrome Custom Tab（推荐）
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -192,7 +185,6 @@ class HomePage extends StatelessWidget {
                   
                   const SizedBox(height: 16),
                   
-                  // 备用按钮 - 系统浏览器
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -213,7 +205,6 @@ class HomePage extends StatelessWidget {
                   
                   const SizedBox(height: 40),
                   
-                  // 提示信息
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
