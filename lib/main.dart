@@ -40,30 +40,24 @@ class WebViewPage extends StatefulWidget {
 class _WebViewPageState extends State<WebViewPage> {
   late final WebViewController controller;
   bool isLoading = true;
-  Timer? _fixTimer;
   int _currentUA = 0;
 
-  // 多种 User-Agent 可切换
   final List<Map<String, String>> userAgents = [
     {
-      'name': 'VIVO 浏览器',
+      'name': 'VIVO',
       'ua': 'Mozilla/5.0 (Linux; Android 13; V2171A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/87.0.4280.141 Mobile Safari/537.36 VivoBrowser/15.5.0.0'
     },
     {
-      'name': 'VIVO 桌面版',
-      'ua': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36 VivoBrowser/15.5.0.0'
+      'name': 'Chrome 桌面版',
+      'ua': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     },
     {
-      'name': 'Safari Mac',
+      'name': 'Safari',
       'ua': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
     },
     {
       'name': 'Firefox',
       'ua': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0'
-    },
-    {
-      'name': 'Edge',
-      'ua': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0'
     },
   ];
 
@@ -73,12 +67,6 @@ class _WebViewPageState extends State<WebViewPage> {
   void initState() {
     super.initState();
     _initWebView();
-  }
-
-  @override
-  void dispose() {
-    _fixTimer?.cancel();
-    super.dispose();
   }
 
   void _initWebView() {
@@ -94,12 +82,7 @@ class _WebViewPageState extends State<WebViewPage> {
           },
           onPageFinished: (url) {
             if (mounted) setState(() => isLoading = false);
-            _injectFix();
-            
-            _fixTimer?.cancel();
-            _fixTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-              _injectFix();
-            });
+            // 不自动注入任何修复
           },
           onWebResourceError: (error) {
             debugPrint('Error: ${error.description}');
@@ -116,7 +99,8 @@ class _WebViewPageState extends State<WebViewPage> {
     });
     
     await controller.setUserAgent(userAgents[index]['ua']!);
-    await controller.reload();
+    await controller.clearCache();
+    await controller.loadRequest(Uri.parse(targetUrl));
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,120 +112,88 @@ class _WebViewPageState extends State<WebViewPage> {
     }
   }
 
-  void _injectFix() {
+  // 轻量级修复 - 只修复关键问题
+  void _lightFix() {
     controller.runJavaScript('''
       (function() {
-        var css = document.getElementById('vivo-fix');
-        if (!css) {
-          css = document.createElement('style');
-          css.id = 'vivo-fix';
-          document.head.appendChild(css);
-        }
+        // 隐藏可能遮挡的元素
+        var hideSelectors = [
+          '[class*="recaptcha"]',
+          '[class*="grecaptcha"]',
+          '[class*="privacy"]',
+          '[class*="cookie"]',
+          '[class*="banner"]',
+          '[class*="popup"]',
+          '[class*="overlay"]',
+          'iframe[src*="recaptcha"]',
+          'iframe[src*="google"]'
+        ];
         
-        css.textContent = \`
-          * {
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-          
-          [class*="message"],
-          [class*="Message"],
-          [class*="chat"],
-          [class*="Chat"],
-          [class*="conversation"],
-          [class*="response"],
-          [class*="Response"],
-          [class*="answer"],
-          [class*="output"],
-          [class*="result"],
-          [class*="content"],
-          [class*="Content"],
-          [class*="bubble"],
-          [class*="text"],
-          [class*="markdown"],
-          [class*="prose"] {
-            visibility: visible !important;
-            opacity: 1 !important;
-            display: block !important;
-            color: inherit !important;
-            overflow: visible !important;
-            height: auto !important;
-            max-height: none !important;
-            transform: none !important;
-            -webkit-transform: none !important;
-          }
-          
-          textarea,
-          input[type="text"],
-          [contenteditable="true"] {
-            visibility: visible !important;
-            opacity: 1 !important;
-            color: #000 !important;
-            -webkit-text-fill-color: #000 !important;
-          }
-          
-          pre, code {
-            visibility: visible !important;
-            opacity: 1 !important;
-            display: block !important;
-            white-space: pre-wrap !important;
-          }
-          
-          [class*="scroll"],
-          [class*="container"],
-          main, article, section {
-            overflow: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-          }
-          
-          p, span, div, h1, h2, h3, h4, h5, h6, li {
-            color: inherit !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-          
-          [class*="stream"],
-          [class*="typing"],
-          [class*="loading"] {
-            visibility: visible !important;
-            opacity: 1 !important;
-          }
-          
-          button, [role="button"] {
-            pointer-events: auto !important;
-          }
-        \`;
+        hideSelectors.forEach(function(selector) {
+          try {
+            document.querySelectorAll(selector).forEach(function(el) {
+              if (el.offsetHeight < 100 || el.style.position === 'fixed') {
+                el.style.display = 'none';
+              }
+            });
+          } catch(e) {}
+        });
         
-        document.body.style.display = 'none';
-        void document.body.offsetHeight;
-        document.body.style.display = '';
-        
-        window.dispatchEvent(new Event('resize'));
+        console.log('Light fix applied');
       })();
     ''');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已清理干扰元素'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  // 强制修复 - 尝试修复显示问题
+  void _forceFix() {
+    controller.runJavaScript('''
+      (function() {
+        // 1. 移除所有 fixed 定位的小元素（可能是遮挡物）
+        document.querySelectorAll('*').forEach(function(el) {
+          var style = window.getComputedStyle(el);
+          if (style.position === 'fixed' && el.offsetHeight < 150 && el.offsetWidth < 300) {
+            el.style.display = 'none';
+          }
+        });
+        
+        // 2. 重新触发渲染
+        window.dispatchEvent(new Event('resize'));
+        
+        console.log('Force fix applied');
+      })();
+    ''');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已尝试修复显示'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('LM Arena (${userAgents[_currentUA]['name']})'),
-        titleTextStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+        title: Text(userAgents[_currentUA]['name']!),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.home),
+          onPressed: () => controller.loadRequest(Uri.parse(targetUrl)),
+        ),
         actions: [
-          // 刷新
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '刷新',
             onPressed: () => controller.reload(),
           ),
-          // 修复显示
-          IconButton(
-            icon: const Icon(Icons.build),
-            tooltip: '修复显示',
-            onPressed: _injectFix,
-          ),
-          // 菜单
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value.startsWith('ua_')) {
@@ -249,14 +201,17 @@ class _WebViewPageState extends State<WebViewPage> {
                 _switchUserAgent(index);
               } else {
                 switch (value) {
-                  case 'home':
-                    controller.loadRequest(Uri.parse(targetUrl));
-                    break;
                   case 'direct':
                     controller.loadRequest(Uri.parse('https://lmarena.ai/c/new?chat-modality=chat&mode=direct'));
                     break;
                   case 'battle':
                     controller.loadRequest(Uri.parse('https://lmarena.ai/c/new?chat-modality=chat&mode=battle'));
+                    break;
+                  case 'light_fix':
+                    _lightFix();
+                    break;
+                  case 'force_fix':
+                    _forceFix();
                     break;
                   case 'clear':
                     await controller.clearCache();
@@ -267,13 +222,15 @@ class _WebViewPageState extends State<WebViewPage> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'home', child: Text('🏠 首页')),
               const PopupMenuItem(value: 'direct', child: Text('💬 直接对话')),
               const PopupMenuItem(value: 'battle', child: Text('⚔️ 模型对战')),
               const PopupMenuDivider(),
+              const PopupMenuItem(value: 'light_fix', child: Text('🧹 清理干扰元素')),
+              const PopupMenuItem(value: 'force_fix', child: Text('🔧 强制修复显示')),
+              const PopupMenuDivider(),
               const PopupMenuItem(
                 enabled: false,
-                child: Text('切换浏览器模式:', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text('切换模式:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
               ),
               ...userAgents.asMap().entries.map((entry) => 
                 PopupMenuItem(
@@ -281,9 +238,9 @@ class _WebViewPageState extends State<WebViewPage> {
                   child: Row(
                     children: [
                       Icon(
-                        _currentUA == entry.key ? Icons.check_circle : Icons.circle_outlined,
+                        _currentUA == entry.key ? Icons.radio_button_checked : Icons.radio_button_off,
                         size: 18,
-                        color: _currentUA == entry.key ? Colors.green : Colors.grey,
+                        color: _currentUA == entry.key ? Colors.blue : Colors.grey,
                       ),
                       const SizedBox(width: 8),
                       Text(entry.value['name']!),
@@ -304,38 +261,10 @@ class _WebViewPageState extends State<WebViewPage> {
             Container(
               color: Colors.white,
               child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('加载中...'),
-                  ],
-                ),
+                child: CircularProgressIndicator(),
               ),
             ),
         ],
-      ),
-      // 底部提示栏
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(8),
-        color: Colors.blue.shade50,
-        child: Row(
-          children: [
-            const Icon(Icons.info_outline, size: 16, color: Colors.blue),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                '如果看不到消息，请点击菜单切换浏览器模式',
-                style: TextStyle(fontSize: 12, color: Colors.blue),
-              ),
-            ),
-            TextButton(
-              onPressed: () => _switchUserAgent(0),
-              child: const Text('试试VIVO', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
       ),
     );
   }
