@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'dart:async';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,7 +68,16 @@ class _WebViewPageState extends State<WebViewPage> {
   @override
   void initState() {
     super.initState();
+    _requestPermissions();
     _initWebView();
+  }
+
+  Future<void> _requestPermissions() async {
+    await [
+      Permission.storage,
+      Permission.photos,
+      Permission.camera,
+    ].request();
   }
 
   void _initWebView() {
@@ -82,14 +93,58 @@ class _WebViewPageState extends State<WebViewPage> {
           },
           onPageFinished: (url) {
             if (mounted) setState(() => isLoading = false);
-            // 不自动注入任何修复
           },
           onWebResourceError: (error) {
             debugPrint('Error: ${error.description}');
           },
         ),
-      )
-      ..loadRequest(Uri.parse(targetUrl));
+      );
+
+    // 配置 Android WebView 支持文件选择
+    _configureFileUpload();
+
+    controller.loadRequest(Uri.parse(targetUrl));
+  }
+
+  void _configureFileUpload() {
+    final platform = controller.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setOnShowFileSelector((params) async {
+        try {
+          // 判断是否只接受图片
+          bool imagesOnly = params.acceptTypes.any((type) => 
+            type.contains('image') || type == 'image/*'
+          );
+          
+          FilePickerResult? result;
+          
+          if (imagesOnly) {
+            result = await FilePicker.platform.pickFiles(
+              type: FileType.image,
+              allowMultiple: params.mode == FileSelectorMode.openMultiple,
+            );
+          } else {
+            result = await FilePicker.platform.pickFiles(
+              type: FileType.any,
+              allowMultiple: params.mode == FileSelectorMode.openMultiple,
+            );
+          }
+
+          if (result != null && result.files.isNotEmpty) {
+            final paths = result.files
+                .where((file) => file.path != null)
+                .map((file) => Uri.file(file.path!).toString())
+                .toList();
+            return paths;
+          }
+          
+          return [];
+        } catch (e) {
+          debugPrint('File picker error: $e');
+          return [];
+        }
+      });
+    }
   }
 
   void _switchUserAgent(int index) async {
@@ -112,11 +167,9 @@ class _WebViewPageState extends State<WebViewPage> {
     }
   }
 
-  // 轻量级修复 - 只修复关键问题
   void _lightFix() {
     controller.runJavaScript('''
       (function() {
-        // 隐藏可能遮挡的元素
         var hideSelectors = [
           '[class*="recaptcha"]',
           '[class*="grecaptcha"]',
@@ -138,8 +191,6 @@ class _WebViewPageState extends State<WebViewPage> {
             });
           } catch(e) {}
         });
-        
-        console.log('Light fix applied');
       })();
     ''');
     
@@ -151,22 +202,16 @@ class _WebViewPageState extends State<WebViewPage> {
     );
   }
 
-  // 强制修复 - 尝试修复显示问题
   void _forceFix() {
     controller.runJavaScript('''
       (function() {
-        // 1. 移除所有 fixed 定位的小元素（可能是遮挡物）
         document.querySelectorAll('*').forEach(function(el) {
           var style = window.getComputedStyle(el);
           if (style.position === 'fixed' && el.offsetHeight < 150 && el.offsetWidth < 300) {
             el.style.display = 'none';
           }
         });
-        
-        // 2. 重新触发渲染
         window.dispatchEvent(new Event('resize'));
-        
-        console.log('Force fix applied');
       })();
     ''');
     
