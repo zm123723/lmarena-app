@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -46,56 +45,33 @@ class HomePage extends StatelessWidget {
 
   final String targetUrl = 'https://lmarena.ai/c/new?chat-modality=chat&mode=direct';
 
-  Future<void> _openInCustomTab(BuildContext context) async {
-    try {
-      await launchUrl(
-        Uri.parse(targetUrl),
-        customTabsOptions: CustomTabsOptions(
-          colorSchemes: CustomTabsColorSchemes.defaults(
-            toolbarColor: Colors.blue,
-          ),
-          shareState: CustomTabsShareState.on,
-          urlBarHidingEnabled: true,
-          showTitle: true,
-          closeButton: CustomTabsCloseButton(
-            icon: CustomTabsCloseButtonIcons.back,
-          ),
-        ),
-        safariVCOptions: SafariViewControllerOptions(
-          preferredBarTintColor: Colors.blue,
-          preferredControlTintColor: Colors.white,
-          barCollapsingEnabled: true,
-          dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
-        ),
-      );
-    } catch (e) {
-      debugPrint('Custom Tab error: $e');
-      _openInBrowser(context);
-    }
-  }
-
-  Future<void> _openInBrowser(BuildContext context) async {
+  Future<void> _openWebsite(BuildContext context) async {
     final uri = Uri.parse(targetUrl);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('无法打开浏览器')),
-          );
-        }
-      }
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
     } catch (e) {
-      debugPrint('Browser error: $e');
+      debugPrint('Error: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('打开失败: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _openInApp(BuildContext context) async {
+    final uri = Uri.parse(targetUrl);
+    try {
+      await launchUrl(
+        uri,
+        mode: LaunchMode.inAppBrowserView,
+      );
+    } catch (e) {
+      debugPrint('Error: $e');
+      _openWebsite(context);
     }
   }
 
@@ -166,7 +142,7 @@ class HomePage extends StatelessWidget {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton.icon(
-                      onPressed: () => _openInCustomTab(context),
+                      onPressed: () => _openInApp(context),
                       icon: const Icon(Icons.launch_rounded, size: 24),
                       label: const Text(
                         '打开 LM Arena',
@@ -189,7 +165,7 @@ class HomePage extends StatelessWidget {
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton.icon(
-                      onPressed: () => _openInBrowser(context),
+                      onPressed: () => _openWebsite(context),
                       icon: const Icon(Icons.open_in_browser_rounded),
                       label: const Text(
                         '用浏览器打开',
@@ -220,7 +196,7 @@ class HomePage extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            '使用 Chrome 浏览器可以避免验证问题',
+                            '推荐使用浏览器打开以避免验证问题',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.primary,
                               fontSize: 14,
